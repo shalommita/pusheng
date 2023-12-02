@@ -1,5 +1,3 @@
-<!-- =============================================================== -->
-
 <?php
 require_once 'koneksi.php';
 
@@ -10,30 +8,38 @@ if ($_SERVER["REQUEST_METHOD"] == "GET" && isset($_GET['klien']) && $_GET['klien
     $selectedKlien = $_GET['klien'];
 
     // Prepare a SQL query to fetch the client details
-    $query = "SELECT * FROM dataKlien WHERE idKlien = '$selectedKlien'";
-    // Execute the query
-    $result = mysqli_query($conn, $query);
+    $query = "SELECT * FROM dataKlien WHERE idKlien = ?";
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param("s", $selectedKlien);
+    $stmt->execute();
 
     // Fetch the data of the selected client
-    $clientData = mysqli_fetch_assoc($result);
+    $result = $stmt->get_result();
+    $clientData = $result->fetch_assoc();
 
     $klienId = $_GET['klien'];
 }
 
-// Check if a search query is submitted
-if ($_SERVER["REQUEST_METHOD"] == "GET" && isset($_GET['search']) && !empty($_GET['search'])) {
-    // Get the search query
-    $searchQuery = $_GET['search'];
+// Check if a search query is provided
+if (isset($_GET['search']) && !empty($_GET['search'])) {
+    $search = $_GET['search'];
+    // Modify the SQL query to include the search condition
+    $query = "SELECT * FROM dataklien WHERE namaKlien LIKE ? OR noRM LIKE ? OR noKTP LIKE ?";
+    $stmt = $conn->prepare($query);
+    $likeParam = "%$search%";
+    $stmt->bind_param("sss", $likeParam, $likeParam, $likeParam);
+    $stmt->execute();
 
-    // Prepare a SQL query to fetch the client details with search
-    $query = "SELECT idPemantau, namaPemantau, jkPemantau, tempatPemantau, DATE_FORMAT(tglPemantau, '%d-%m-%Y') as formattedDate, peran FROM datapemantau 
-              WHERE namaPemantau LIKE '%$searchQuery%' OR tempatPemantau LIKE '%$searchQuery%'";
+    $searchResult = $stmt->get_result();
 } else {
-    // If no search query, fetch all data
-    $query = "SELECT idPemantau, namaPemantau, jkPemantau, tempatPemantau, DATE_FORMAT(tglPemantau, '%d-%m-%Y') as formattedDate, peran FROM datapemantau";
+    // Default query without search condition
+    $query = "SELECT * FROM dataklien";
+    $stmt = $conn->prepare($query);
+    $stmt->execute();
+
+    $searchResult = $stmt->get_result();
 }
 
-$result = $conn->query($query);
 ?>
 
 <!doctype html>
@@ -61,17 +67,6 @@ $result = $conn->query($query);
 
 
     <style>
-        /* Button styling */
-        button {
-            cursor: pointer;
-            padding: 0.5rem 1rem;
-            margin: 0.2rem;
-            border: none;
-            border-radius: 4px;
-            background-color: #007bff;
-            color: #fff;
-        }
-
         .bd-placeholder-img {
             font-size: 1.125rem;
             text-anchor: middle;
@@ -79,32 +74,6 @@ $result = $conn->query($query);
             -moz-user-select: none;
             user-select: none;
         }
-
-        /* @media print {
-            .table {
-                width: 100%;
-                margin-bottom: 1rem;
-                color: #212529;
-                border-collapse: collapse;
-            }
-
-            .table th, table td {
-                padding: 0.75rem;
-                vertical-align: top;
-                border-top: 1px solid #dee2e6;
-            }
-
-            .table th {
-                background-color: #FFE69B;
-                font-weight: bold;
-                text-align: center;
-            }
-
-            tbody {
-                background-color: #FFFAF3;
-                text-align: left;
-            }
-        } */
 
         @media (min-width: 768px) {
             .bd-placeholder-img-lg {
@@ -155,6 +124,17 @@ $result = $conn->query($query);
         tbody tr:hover {
             background-color: rgba(0, 123, 255, 0.1);
         }
+
+        /* Button styling */
+        button {
+            cursor: pointer;
+            padding: 0.5rem 1rem;
+            margin: 0.2rem;
+            border: none;
+            border-radius: 4px;
+            background-color: #007bff;
+            color: #fff;
+        }
     </style>
 
     <!-- Custom styles for this template -->
@@ -191,12 +171,12 @@ $result = $conn->query($query);
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="dataKlien.php">
+                            <a class="nav-link active" href="dataKlien.php">
                                 Data Klien
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link active" href="dataPemantau.php">
+                            <a class="nav-link" href="dataPemantau.php">
                                 Data Pemantau
                             </a>
                         </li>
@@ -216,13 +196,13 @@ $result = $conn->query($query);
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <div>
                             <form method="GET" action="">
-                                <input type="text" name="search" placeholder="Cari Data Pemantau">
+                                <input type="text" name="search" placeholder="Cari Data Klien">
                                 <button type="submit" style="background-color: orange;">Cari</button>
                             </form>
                         </div>
                         <div class="button-edit">
-                            <button style="background-color: orange;" type="button" onclick="window.location.href='tambahDataPemantau.php'">Tambah Data</button>
-                            <button style="background-color: orange;" type="button" onclick="myPrint('myformPemantau')" value="print">Cetak Data Pemantau</button>
+                            <button style="background-color: orange;" type="button" onclick="window.location.href='tambahDataKlien.php'">Tambah Data</button>
+                            <button style="background-color: orange;" type="button" onclick="myPrint('myform')" value="print">Cetak Data Klien</button>
                             <button style="background-color: orange;" type="button" onclick="tableToExcel()">Excel</button>
                         </div>
                     </div>
@@ -237,35 +217,69 @@ $result = $conn->query($query);
 
                     <!-- =================Tabel=============== -->
                     <br>
-                    <table class="table" id="myformPemantau">
+                    <table class="table" id="myform">
                         <thead>
                             <tr>
-                                <th>ID Pemantau</th>
-                                <th>Nama Pemantau</th>
-                                <th>Jenis Kelamin</th>
-                                <th>Tempat Lahir</th>
-                                <th>Tanggal Lahir</th>
-                                <th>Peran</th>
+                            <th>No. RM</th>
+                            <th>No. KTP</th>
+                            <th>Nama Klien</th>
+                            <th>Jenis Kelamin</th>
+                            <th>Tempat Lahir</th>
+                            <th>Tanggal Lahir</th>
+                            <th>Alamat</th>
+                            <th>Tanggal Masuk</th>
+                            <th>Kondisi Awal</th>
+                            <th>Foto Klien</th>
+                            <th>Status</th>
+                            <th>Aksi</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php
-                                if (mysqli_num_rows($result) > 0) {
-                                    while ($row = mysqli_fetch_assoc($result)) {
-                                        echo "<tr>";
-                                        echo "<td>" . $row["idPemantau"] . "</td>";
-                                        echo "<td>" . $row["namaPemantau"] . "</td>";
-                                        echo "<td>" . $row["jkPemantau"] . "</td>";
-                                        echo "<td>" . $row["tempatPemantau"] . "</td>";
-                                        echo "<td>" . $row["formattedDate"] . "</td>";
-                                        echo "<td>" . $row["peran"] . "</td>";
-                                        echo "</tr>";
-                                    }
-                                } else {
-                                    echo "<tr><td colspan='6'>Tidak ada data pemantau yang tersedia.</td></tr>";
-                                }
+                            if ($searchResult->num_rows > 0) {
+                                while ($row = $searchResult->fetch_assoc()) {
+                                    echo "<tr>";
+                                    echo "<td>" . $row["noRM"] . "</td>";
+                                    echo "<td>" . $row["noKTP"] . "</td>";
+                                    echo "<td>" . $row["namaKlien"] . "</td>";
+                                    echo "<td>" . $row["jkKlien"] . "</td>";
+                                    echo "<td>" . $row["tempatLahirKlien"] . "</td>";
+                                    echo "<td>" . date('d/m/Y', strtotime($row["tglLahirKlien"])) . "</td>";
+                                    echo "<td>" . $row["alamat"] . "</td>";
+                                    echo "<td>" . date('d/m/Y', strtotime($row["tglMasuk"])) . "</td>";
 
-                                $conn->close();
+                                    // Kondisi Awal
+                                    echo "<td>";
+                                    if (isset($row["kondisiAwl"])) {
+                                        echo $row["kondisiAwl"];
+                                    } else {
+                                        echo "Tidak ada data";
+                                    }
+                                    echo "</td>";
+
+                                    // Foto Klien
+                                    echo "<td>";
+                                    if (isset($row["fotoKlien"])) {
+                                        echo "<img src='data:image/jpeg;base64," . base64_encode($row["fotoKlien"]) . "' alt='Foto Klien' width='100px' height='100px'>";
+                                    } else {
+                                        echo "Tidak ada data";
+                                    }
+                                    echo "</td>";
+
+                                    echo "<td>" . $row["status"] . "</td>";
+
+                                    // Action dengan tombol edit (icon)
+                                    echo "<td>";
+                                    if (isset($row["idKlien"])) {
+                                        echo "<a href='editKlien.php?id=" . $row["idKlien"] . "' class='btn btn-primary'><i class='bi bi-pencil'></i></a>";
+                                        echo "<a href='cetakPdf.php?id=" . $row["idKlien"] . "' class='btn btn-secondary'><i class='bi bi-file-text'></i></a>";
+                                    }
+                                    echo "</td>";
+                                    echo "</tr>";
+                                }
+                            } else {
+                                echo "<tr><td colspan='12'>Tidak ada data klien yang tersedia.</td></tr>";
+                            }
                             ?>
                         </tbody>
                     </table>
@@ -288,12 +302,10 @@ $result = $conn->query($query);
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-o53vqJDzg1R6bD5b2XxRl5qmZz9p5ZWFrN1aCk4fFA4gIFBvcR5JNA2yo8hEAAJ3" crossorigin="anonymous"></script>
 
     <script>
-        function myPrint(myformPemantau){
-            var printdata = document.getElementById(myformPemantau);
+        function myPrint(myform){
+            var printdata = document.getElementById(myform);
             newwin=window.open("");
-            newwin.document.write('<html><head><title>Cetak Data Pemantau</title></head><body>');
             newwin.document.write(printdata.outerHTML);
-            newwin.document.write('</body></html>');
             newwin.print();
             newwin.close();
         }

@@ -1,39 +1,13 @@
-<!-- =============================================================== -->
-
 <?php
 require_once 'koneksi.php';
 
-$klienId = '';
-
-if ($_SERVER["REQUEST_METHOD"] == "GET" && isset($_GET['klien']) && $_GET['klien']) {
-    // Get the selected client ID
-    $selectedKlien = $_GET['klien'];
-
-    // Prepare a SQL query to fetch the client details
-    $query = "SELECT * FROM dataKlien WHERE idKlien = '$selectedKlien'";
-    // Execute the query
-    $result = mysqli_query($conn, $query);
-
-    // Fetch the data of the selected client
-    $clientData = mysqli_fetch_assoc($result);
-
-    $klienId = $_GET['klien'];
-}
-
-// Check if a search query is submitted
-if ($_SERVER["REQUEST_METHOD"] == "GET" && isset($_GET['search']) && !empty($_GET['search'])) {
-    // Get the search query
-    $searchQuery = $_GET['search'];
-
-    // Prepare a SQL query to fetch the client details with search
-    $query = "SELECT idPemantau, namaPemantau, jkPemantau, tempatPemantau, DATE_FORMAT(tglPemantau, '%d-%m-%Y') as formattedDate, peran FROM datapemantau 
-              WHERE namaPemantau LIKE '%$searchQuery%' OR tempatPemantau LIKE '%$searchQuery%'";
-} else {
-    // If no search query, fetch all data
-    $query = "SELECT idPemantau, namaPemantau, jkPemantau, tempatPemantau, DATE_FORMAT(tglPemantau, '%d-%m-%Y') as formattedDate, peran FROM datapemantau";
-}
+// Query untuk mengambil data jadwal dengan JOIN pada tabel datapemantau
+$query = "SELECT j.idJadwal, j.hariTgl, j.kegiatan, p.namaPemantau, j.koordHarian 
+          FROM jadwalharian j
+          JOIN datapemantau p ON j.idPemantau = p.idPemantau";
 
 $result = $conn->query($query);
+
 ?>
 
 <!doctype html>
@@ -181,7 +155,7 @@ $result = $conn->query($query);
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="jadwal.php">
+                            <a class="nav-link active" href="jadwal.php">
                                 Jadwal Harian
                             </a>
                         </li>
@@ -196,7 +170,7 @@ $result = $conn->query($query);
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link active" href="dataPemantau.php">
+                            <a class="nav-link" href="dataPemantau.php">
                                 Data Pemantau
                             </a>
                         </li>
@@ -221,7 +195,7 @@ $result = $conn->query($query);
                             </form>
                         </div>
                         <div class="button-edit">
-                            <button style="background-color: orange;" type="button" onclick="window.location.href='tambahDataPemantau.php'">Tambah Data</button>
+                            <button style="background-color: orange;" type="button" onclick="window.location.href='tambahDataJadwal.php'">Tambah Data</button>
                             <button style="background-color: orange;" type="button" onclick="myPrint('myformPemantau')" value="print">Cetak Data Pemantau</button>
                             <button style="background-color: orange;" type="button" onclick="tableToExcel()">Excel</button>
                         </div>
@@ -237,32 +211,30 @@ $result = $conn->query($query);
 
                     <!-- =================Tabel=============== -->
                     <br>
-                    <table class="table" id="myformPemantau">
+                    <table class="table" id="myformJadwal">
                         <thead>
                             <tr>
-                                <th>ID Pemantau</th>
+                                <th>ID Jadwal</th>
+                                <th>Hari/Tanggal</th>
+                                <th>Kegiatan</th>
                                 <th>Nama Pemantau</th>
-                                <th>Jenis Kelamin</th>
-                                <th>Tempat Lahir</th>
-                                <th>Tanggal Lahir</th>
-                                <th>Peran</th>
+                                <th>Koordinator Harian</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php
-                                if (mysqli_num_rows($result) > 0) {
-                                    while ($row = mysqli_fetch_assoc($result)) {
+                                if ($result->num_rows > 0) {
+                                    while ($row = $result->fetch_assoc()) {
                                         echo "<tr>";
-                                        echo "<td>" . $row["idPemantau"] . "</td>";
+                                        echo "<td>" . $row["idJadwal"] . "</td>";
+                                        echo "<td>" . $row["hariTgl"] . "</td>";
+                                        echo "<td>" . $row["kegiatan"] . "</td>";
                                         echo "<td>" . $row["namaPemantau"] . "</td>";
-                                        echo "<td>" . $row["jkPemantau"] . "</td>";
-                                        echo "<td>" . $row["tempatPemantau"] . "</td>";
-                                        echo "<td>" . $row["formattedDate"] . "</td>";
-                                        echo "<td>" . $row["peran"] . "</td>";
+                                        echo "<td>" . $row["koordHarian"] . "</td>";
                                         echo "</tr>";
                                     }
                                 } else {
-                                    echo "<tr><td colspan='6'>Tidak ada data pemantau yang tersedia.</td></tr>";
+                                    echo "<tr><td colspan='5'>Tidak ada data jadwal yang tersedia.</td></tr>";
                                 }
 
                                 $conn->close();
@@ -288,8 +260,8 @@ $result = $conn->query($query);
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-o53vqJDzg1R6bD5b2XxRl5qmZz9p5ZWFrN1aCk4fFA4gIFBvcR5JNA2yo8hEAAJ3" crossorigin="anonymous"></script>
 
     <script>
-        function myPrint(myformPemantau){
-            var printdata = document.getElementById(myformPemantau);
+        function myPrint(myformJadwal){
+            var printdata = document.getElementById(myformJadwal);
             newwin=window.open("");
             newwin.document.write('<html><head><title>Cetak Data Pemantau</title></head><body>');
             newwin.document.write(printdata.outerHTML);
